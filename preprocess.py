@@ -19,7 +19,7 @@ def crop_image(img, resize_width=299, resize_height=299):
 
     #RETR_EXTERNAL finds only extreme outer contours
     #CHAIN_APPROX_SIMPLE compresses segments leaving only the end points
-    contours,hierarchy = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    gray,contours,hierarchy = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     #this catches any images that are too dark. I wasn't able to find any examples to test this though
     if not contours:
         print('No contours! Image is too dark')
