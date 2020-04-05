@@ -50,6 +50,9 @@ import cv2
 import csv
 import random
 from keras.utils.np_utils import to_categorical
+from tensorflow.python.keras.callbacks import TensorBoard
+from tensorflow.keras.optimizers import RMSprop
+
 
 
 # In[2]:
@@ -60,7 +63,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import cv2
-import time
+from time import time
 # defining global variable path
 image_path = 'data/resized train 19'
 test_image_path = 'data/resized test 19'
@@ -70,7 +73,7 @@ def loadImages(path):
     return image_files
 image_path_array = loadImages(image_path)
 test_data_image_path_array = loadImages(test_image_path)
-image_path_array[:5]
+image_path_array[:200]
 
 
 # In[3]:
@@ -104,7 +107,7 @@ def display_samples(df, columns=4, rows=3):
     for i in range(columns*rows):
         image_path = df.loc[i,'id_code']
         image_id = df.loc[i,'diagnosis']
-        img = cv2.imread('./data/resized train 19/{}.png'.format(image_path))
+        img = cv2.imread('./data/preprocessed/{}.png'.format(image_path))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 #         img = crop_image(img)
         
@@ -126,7 +129,7 @@ def crop_image(img, resize_width=299, resize_height=299):
 
     #RETR_EXTERNAL finds only extreme outer contours
     #CHAIN_APPROX_SIMPLE compresses segments leaving only the end points
-    contours,hierarchy = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    gray, contours,hierarchy = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     #this catches any images that are too dark. I wasn't able to find any examples to test this though
     if not contours:
         print('No contours! Image is too dark')
@@ -248,8 +251,8 @@ display_samples(train_df)
 # In[12]:
 
 
-train_images = processing(image_path_array, 50,100,100) 
-test_images =  processing(test_data_image_path_array, 10,100,100) 
+train_images = processing(image_path_array, 2048,100,100) 
+test_images =  processing(test_data_image_path_array, 200,100,100) 
 
 
 # In[13]:
@@ -258,8 +261,8 @@ test_images =  processing(test_data_image_path_array, 10,100,100)
 # b = image_path_array[:len(train_images)]
 # id_code = b[0][18:-4]
 # print(id_code)
-train_classes = train_df['diagnosis'][:50]
-test_classes = test_df['level'][:10]
+train_classes = train_df['diagnosis'][:2048]
+test_classes = test_df['level'][:200]
 
 print(len(train_classes))
 
@@ -521,7 +524,8 @@ def InceptionNetworkV3(input_image):
     output_classes = keras.layers.Dense(num_classes, activation='softmax')(dense_to_output)
     
     model = keras.Model(inputs=First_layer, outputs=output_classes)
-    model.compile(optimizer='rmsprop',
+    opt =RMSprop(lr=0.5)
+    model.compile(optimizer=opt,
               loss='categorical_crossentropy',
               metrics=['accuracy'])
     return model
@@ -531,7 +535,7 @@ def InceptionNetworkV3(input_image):
 
 
 model = InceptionNetworkV3(train_images[0])
-
+tensorboard = TensorBoard(log_dir='logs/{}'.format(time()))
 
 # In[ ]:
 
@@ -553,9 +557,9 @@ model.summary()
 
 # In[21]:
 
-starttime = time.time()
-history = model.fit(train_images, to_categorical(train_classes), epochs=100 , batch_size=32)
-endtime = time.time()
+starttime = time()
+history = model.fit(train_images, to_categorical(train_classes), epochs=100 , batch_size=128,callbacks=[tensorboard])
+endtime = time()
 print((endtime - starttime)/60)
 # In[56]:
 
