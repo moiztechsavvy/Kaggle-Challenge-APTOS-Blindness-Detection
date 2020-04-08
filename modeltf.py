@@ -1,3 +1,6 @@
+#Okay, So this step was completely Useless. I should've done better research, this only works well with Tensorflow 1, not tf 2.0
+
+
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,11 +22,11 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.contrib import slim as contrib_slim
+from tensorflow import slim as contrib_slim
 
 from nets import inception_utils
 
-slim = contrib_slim
+slim = contrib_slims
 
 # pylint: disable=g-long-lambda
 trunc_normal = lambda stddev: tf.compat.v1.truncated_normal_initializer(

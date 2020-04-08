@@ -56,10 +56,11 @@ def crop_image(img, resize_width=299, resize_height=299):
         
 #read in image, do median subtraction, crop and resize, save preprocessed image
 #REMEMBER TO CHANGE BACK TO allCells.csv (w/o 2) IN FOLLOWING LINE
-df = pd.read_csv('allCells2.csv', usecols = ['image_id', 'Path_to_image'])
+df = pd.read_csv('finaltestdata.csv', usecols = ['id_code', 'dataSet'])
 #count = 0
-for i,j in zip(df['Path_to_image'], df['image_id']):
-    img = cv2.imread(i)
+for i,j in zip(df['dataSet'], df['id_code']):
+    path = i +'/'+ j + '.png'
+    img = cv2.imread(path)
     img = subtract_median(img)
     img = crop_image(img)
-    cv2.imwrite('data/preprocessed/' + j + '.png', img)
+    cv2.imwrite('data/test_preprocessed/' + j + '.png', img)
