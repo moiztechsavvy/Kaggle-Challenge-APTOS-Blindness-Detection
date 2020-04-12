@@ -46,25 +46,64 @@ import zipfile
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 import matplotlib.pyplot as plt
 import cv2
 import csv
 import pathlib
 import random
-from keras.utils.np_utils import to_categorical
 from tensorflow.python.keras.callbacks import TensorBoard
 from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras import models,layers
 import os
+#This Library wasn't supported with Tensorflow2.0
+#import tensorflow_addons as tfa
 from PIL import Image
 from time import time
-from keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+
+
+# In[3]
+# 
+def kappa_loss(y_pred, y_true, y_pow=2, eps=1e-10, N=5, bsize=256, name='kappa'):
+  """A continuous differentiable approximation of discrete kappa loss.
+      Args:
+          y_pred: 2D tensor or array, [batch_size, num_classes]
+          y_true: 2D tensor or array,[batch_size, num_classes]
+          y_pow: int,  e.g. y_pow=2
+          N: typically num_classes of the model
+          bsize: batch_size of the training or validation ops
+          eps: a float, prevents divide by zero
+          name: Optional scope/name for op_scope.
+      Returns:
+          A tensor with the kappa loss."""
+  with tf.name_scope(name):
+      y_true = tf.cast(y_true,dtype='float')
+      repeat_op = tf.cast(tf.tile(tf.reshape(tf.range(0, N), [N, 1]), [1, N]), dtype='float')
+      repeat_op_sq = tf.square((repeat_op - tf.transpose(repeat_op)))
+      weights = repeat_op_sq / tf.cast((N - 1) ** 2, dtype='float')
+
+      pred_ = y_pred ** y_pow
+      try:
+          pred_norm = pred_ / (eps + tf.reshape(tf.reduce_sum(pred_, 1), [-1, 1]))
+      except Exception:
+          pred_norm = pred_ / (eps + tf.reshape(tf.reduce_sum(pred_, 1), [bsize, 1]))
+
+      hist_rater_a = tf.reduce_sum(pred_norm, 0)
+      hist_rater_b = tf.reduce_sum(y_true, 0)
+
+      conf_mat = tf.matmul(tf.transpose(pred_norm), y_true)
+
+      nom = tf.reduce_sum(weights * conf_mat)
+      denom = tf.reduce_sum(weights * tf.matmul(
+          tf.reshape(hist_rater_a, [N, 1]), tf.reshape(hist_rater_b, [1, N])) /
+                            tf.cast(bsize, dtype='float'))
+      return nom / (denom + eps)
 # In[2]:
 #Getting Paths of All Images
 test_dataframe = pd.read_csv('allCells.csv')
 X = test_dataframe['image_id']
 Y = test_dataframe['diagnosis']
-X = ['data/preprocessed_train/' + i + '.png' for i in X]
+X = ['data/preprocessed_train/' + i + '.png' for i in X if ".png" not in i]
 image_count = len(X)
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 BATCH_SIZE = 32
@@ -77,14 +116,6 @@ CLASS_NAMES = np.array(['0.0','1.0','2.0','3.0','4.0'])
 
 Y[:5]
 X = tf.data.Dataset.from_tensor_slices([i+'|'+str(j) for i,j in zip(X,Y)])
-
-# In[2]:
-#Remove at the end
-for f in X.take(5):
-  print(get_label(f.numpy()))
-
-# In[2]:
-
 #Function modified from https://www.tensorflow.org/tutorials/load_data/images
 def get_label(file_path):
   # convert the path to a list of path components
@@ -105,16 +136,23 @@ def process_path(file_path):
   # load the raw data from the file as a string
   img = tf.io.read_file(img_path)
   img = decode_img(img)
-  return img, label
+  return img/255, label
+# In[2]:
+#Remove at the end
+for f in X.take(5):
+  print(get_label(f.numpy()))
+
+# In[2]:
 
 # Set `num_parallel_calls` so multiple images are loaded/processed in parallel.
 X = X.map(process_path, num_parallel_calls=AUTOTUNE)
 # In[13]:
 #Remove at the end.
-for image, label in X.take(1):
-  print("Image shape: ", image.numpy().shape)
+for image, label in X:
+  print("Image shape: ", image.numpy())
   print("Label: ", label.numpy())
 print(type(X))
+
 # In[13]:
 
 
@@ -124,7 +162,7 @@ train_size = int(0.9 * image_count)
 val_size = int(0.05 * image_count)
 test_size = int(0.05 * image_count)
 full_dataset = X
-train_dataset = full_dataset.take(train_size)
+train_dataset = full_dataset.take(train_size).shuffle(1000)
 test_dataset = full_dataset.skip(train_size)
 val_dataset = test_dataset.skip(test_size)
 test_dataset = test_dataset.take(test_size)
@@ -133,57 +171,37 @@ test_dataset = test_dataset.take(test_size)
 
 # In[15]:
 
+print(test_dataset)
 
-
-def InceptionNetworkV3(input_image):# Input Value
-    Inception_network = InceptionV3(First_layer)
-     
-    
-    
-    #Add Auxillary branch Here.
-    
-    flatten =  keras.layers.Flatten()(Inception_network)
-    dense_to_output = keras.layers.Dense(64, activation='relu')(flatten)
-    output_classes = keras.layers.Dense(num_classes, activation='softmax')(dense_to_output)
-    
-    model = keras.Model(inputs=First_layer, outputs=output_classes)
-    opt =RMSprop(lr=0.5)
-    model.compile(optimizer=opt,
+def InceptionNetworkV3():# Input Value
+  input_shape = (299,299,3)
+  model = models.Sequential()
+  model.add(InceptionV3(input_shape=input_shape, weights=None, include_top=False))
+  model.add(layers.Flatten())
+  model.add(layers.Dense(64, activation='relu'))
+  model.add(layers.Dense(5))
+  model.compile(optimizer=tf.compat.v1.train.RMSPropOptimizer(0.01),
               loss='categorical_crossentropy',
               metrics=['accuracy'])
-    return model
-
+  return model
+#kappa_loss optimizer
 
 # In[54]:
 
 
-model = InceptionNetworkV3(train_dataset.take(0))
+model = InceptionNetworkV3()
 tensorboard = TensorBoard(log_dir='logs/{}'.format(time()))
-
-# In[ ]:
-
-
-
-
-
-# In[55]:
-
-
 model.summary()
 
 
-# In[20]:
-
-
-
+# In[ ]:
+type(train_dataset)
+# iterable_ds = iter(train_dataset.batch(100).repeat(100))
 
 
 # In[21]:
-
-starttime = time()
-history = model.fit(train_images, to_categorical(train_classes), epochs=100 , batch_size=128,callbacks=[tensorboard])
-endtime = time()
-print((endtime - starttime)/60)
+#sess = tf.Session()
+history = model.fit(train_dataset.batch(100).repeat(100),shuffle=True , epochs=100 ,callbacks=[tensorboard])
 # In[56]:
 
 
@@ -204,9 +222,7 @@ print("current models Accuracy On it's self {} ".format(train_acc))
 
 
 # In[ ]:
-
-
-tf.version()
+xs.shape
 
 
 # In[ ]:
