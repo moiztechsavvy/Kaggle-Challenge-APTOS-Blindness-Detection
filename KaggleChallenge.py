@@ -100,10 +100,10 @@ def kappa_loss(y_pred, y_true, y_pow=2, eps=1e-10, N=5, bsize=256, name='kappa')
       return nom / (denom + eps)
 # In[2]:
 #Getting Paths of All Images
-test_dataframe = pd.read_csv('allCells.csv')
+test_dataframe = pd.read_csv('/home/awall03/Datafile/allCells.csv')
 X = test_dataframe['image_id']
 Y = test_dataframe['diagnosis']
-X = ['data/preprocessed_train/' + i + '.png' for i in X if ".png" not in i]
+X = ['/home/awall03/Datafile/data/preprocessed_train/' + i + '.png' for i in X if ".png" not in i]
 image_count = len(X)
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 BATCH_SIZE = 32
@@ -148,10 +148,10 @@ for f in X.take(5):
 X = X.map(process_path, num_parallel_calls=AUTOTUNE)
 # In[13]:
 #Remove at the end.
-for image, label in X:
-  print("Image shape: ", image.numpy())
-  print("Label: ", label.numpy())
-print(type(X))
+# for image, label in X:
+#   print("Image shape: ", image.numpy())
+#   print("Label: ", label.numpy())
+# print(type(X))
 
 # In[13]:
 
@@ -177,8 +177,6 @@ def InceptionNetworkV3():# Input Value
   input_shape = (299,299,3)
   model = models.Sequential()
   model.add(InceptionV3(input_shape=input_shape, weights=None, include_top=False))
-  model.add(layers.Flatten())
-  model.add(layers.Dense(64, activation='relu'))
   model.add(layers.Dense(5))
   model.compile(optimizer=tf.compat.v1.train.RMSPropOptimizer(0.01),
               loss='categorical_crossentropy',
@@ -197,11 +195,12 @@ model.summary()
 # In[ ]:
 type(train_dataset)
 # iterable_ds = iter(train_dataset.batch(100).repeat(100))
+train_dataset = train_dataset.map(lambda img, label: (tf.image.convert_image_dtype(img,dtype=tf.float32), label))
 
 
 # In[21]:
 #sess = tf.Session()
-history = model.fit(train_dataset.batch(100).repeat(100),shuffle=True , epochs=100 ,callbacks=[tensorboard])
+history = model.fit(train_dataset.batch(32),shuffle=True , epochs=100 ,callbacks=[tensorboard])
 # In[56]:
 
 
@@ -212,7 +211,7 @@ plt.ylabel('Accuracy')
 plt.ylim([0.5, 1])
 plt.legend(loc='lower right')
 
-train_loss, train_acc = model.evaluate(test_images,  test_classes, verbose=2)
+#train_loss, train_acc = model.evaluate(test_images,  test_classes, verbose=2)
 
 
 # In[57]:
