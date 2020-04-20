@@ -221,10 +221,10 @@ print("current models Accuracy On it's self {} ".format(train_acc))
 
 
 # In[ ]:
-xs.shape
 
 
 # In[ ]:
+
 
 
 
